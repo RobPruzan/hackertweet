@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   
   if (!bearerToken || bearerToken === 'your_bearer_token_here') {
     return NextResponse.json(
-      { error: 'Twitter Bearer Token not configured. Please add your token to .env.local' },
+      { error: 'Twitter Bearer Token not configured in environment variables' },
       { status: 500 }
     );
   }
@@ -25,11 +25,24 @@ export async function GET(request: NextRequest) {
     );
 
     if (!userResponse.ok) {
-      const error = await userResponse.json();
-      return NextResponse.json({ error: error }, { status: userResponse.status });
+      const errorData = await userResponse.json().catch(() => ({}));
+      
+      // Return more helpful error
+      return NextResponse.json({ 
+        error: 'Failed to authenticate with X API. Your Bearer Token may be invalid or expired.',
+        details: errorData,
+        help: 'Get a new Bearer Token from https://developer.x.com/en/portal/dashboard'
+      }, { status: userResponse.status });
     }
 
     const userData = await userResponse.json();
+    
+    if (!userData.data) {
+      return NextResponse.json({ 
+        error: `User @${username} not found` 
+      }, { status: 404 });
+    }
+    
     const userId = userData.data.id;
 
     // Then get their tweets
@@ -43,8 +56,11 @@ export async function GET(request: NextRequest) {
     );
 
     if (!tweetsResponse.ok) {
-      const error = await tweetsResponse.json();
-      return NextResponse.json({ error: error }, { status: tweetsResponse.status });
+      const error = await tweetsResponse.json().catch(() => ({}));
+      return NextResponse.json({ 
+        error: 'Failed to fetch tweets',
+        details: error 
+      }, { status: tweetsResponse.status });
     }
 
     const tweetsData = await tweetsResponse.json();
